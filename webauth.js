@@ -14,11 +14,11 @@ authMethods[AUTH_BASIC] = basic.auth;
 
 function getAuthMethName(res) {
 	var authHeader = res.headers['www-authenticate'] || '',
-		proposedAuthMethods = authHeader.split(',');
+		proposedAuthMethods = authHeader.toLowerCase().split(',');
 
 	for(var methName in authMethods) {
 		for(var i = 0; i < proposedAuthMethods.length; i++) {
-			if(proposedAuthMethods[i].indexOf(methName) !== -1)
+			if(proposedAuthMethods[i].indexOf(methName.toLowerCase()) !== -1)
 				return methName;
 		}
 	}
