@@ -26,19 +26,19 @@ function getAuthMethName(res) {
 	return '';
 }
 
-var auth = exports.auth = function(reqOptions, credentials, callback, isHttps, res, method) {
+var auth = exports.auth = function(reqOptions, credentials, bodyChunks, callback, isHttps, res, method) {
 	var protocolInterface = isHttps ? https : http;
 
 	if(res) {
 		method = method || getAuthMethName(res);
 
 		if(method && res.statusCode === 401)
-			authMethods[method](credentials, callback, reqOptions, protocolInterface);
+			authMethods[method](credentials, bodyChunks, callback, reqOptions, protocolInterface);
 		else
 			callback(res);
 	} else {	
 		protocolInterface.request(reqOptions, function(response) {
-			auth(reqOptions, credentials, callback, isHttps, response, method);
+			auth(reqOptions, credentials, bodyChunks, callback, isHttps, response, method);
 		}).end();
 	}
 };
