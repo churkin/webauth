@@ -1,10 +1,10 @@
 {
   "name": "webauth",
   "description": "Web authentication module",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "Sam Decrock (https://github.com/SamDecrock/)",
   "contributors": [
-    "Churkin Andrey <a.sturmfuhrer@gmail.com> (https://github.com/churkin)"
+    "Churkin Andrey (https://github.com/churkin)"
   ],
   "engines": {
     "node": ">= 0.10.0"
