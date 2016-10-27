@@ -1,45 +1,73 @@
-var basic = require('./lib/basic'),
-	http = require('http'),
-	https = require('https'),
-	ntlm = require('./lib/ntlm');
-	
-// Consts
-var AUTH_BASIC = exports.AUTH_BASIC = 'Basic',
-	AUTH_NTLM = exports.AUTH_NTLM = 'NTLM';
+var ntlm = require('./lib/ntlm');
 
-var authMethods = {};
+var authMethods = ['NTLM', 'Basic'];
 
-authMethods[AUTH_NTLM] = ntlm.auth;
-authMethods[AUTH_BASIC] = basic.auth;
+function getAuthMethName (res) {
+	var authHeader          = res.headers['www-authenticate'] || '';
+	var proposedAuthMethods = authHeader.toLowerCase().split(',');
 
-function getAuthMethName(res) {
-	var authHeader = res.headers['www-authenticate'] || '',
-		proposedAuthMethods = authHeader.toLowerCase().split(',');
-
-	for(var methName in authMethods) {
-		for(var i = 0; i < proposedAuthMethods.length; i++) {
-			if(proposedAuthMethods[i].indexOf(methName.toLowerCase()) !== -1)
-				return methName;
+	for (var i = 0; i < authMethods.length; i++) {
+		for (var j = 0; j < proposedAuthMethods.length; j++) {
+			if (proposedAuthMethods[j].indexOf(authMethods[i].toLowerCase()) !== -1)
+				return authMethods[i];
 		}
 	}
 
 	return '';
 }
 
-var auth = exports.auth = function(reqOptions, credentials, bodyChunks, callback, isHttps, res, method) {
-	var protocolInterface = isHttps ? https : http;
+function addBasicReqInfo (credentials, reqOptions) {
+	var authReqStr    = credentials.username + ':' + credentials.password;
+	var authReqHeader = 'Basic ' + new Buffer(authReqStr).toString('base64');
 
-	if(res) {
-		method = method || getAuthMethName(res);
+	reqOptions.headers['Authorization'] = authReqHeader;
+}
 
-		if(method && res.statusCode === 401)
-			authMethods[method](credentials, bodyChunks, callback, reqOptions, protocolInterface);
+function addNTLMNegotiateMessageReqInfo (credentials, reqOptions, protocolInterface) {
+	var agent = new protocolInterface.Agent();
+
+	agent.maxSockets = 1;
+	reqOptions.agent = agent;
+
+	reqOptions.headers['connection']    = 'keep-alive';
+	reqOptions.headers['Authorization'] = ntlm.createType1Message({
+		domain:      credentials.domain || '',
+		workstation: credentials.workstation || ''
+	});
+}
+
+function addNTLMAuthenticateReqInfo (credentials, reqOptions, res) {
+	var type2msg = ntlm.parseType2Message(res.headers['www-authenticate']),
+		type3msg = ntlm.createType3Message(type2msg, {
+			username:    credentials.username,
+			password:    credentials.password,
+			domain:      credentials.domain || '',
+			workstation: credentials.workstation || ''
+		});
+
+	reqOptions.headers['Authorization'] = type3msg;
+	reqOptions.headers['connection']    = 'close';
+}
+
+exports.addCredentials = function (credentials, reqOptions, res, protocolInterface) {
+	var authInfo = exports.getAuthInfo(res);
+
+	if (authInfo.method === 'Basic')
+		addBasicReqInfo(credentials, reqOptions);
+	else if (authInfo.method === 'NTLM') {
+		if (!authInfo.isChallengeMessage)
+			addNTLMNegotiateMessageReqInfo(credentials, reqOptions, protocolInterface);
 		else
-			callback(res);
-	} else {	
-		protocolInterface.request(reqOptions, function(response) {
-			auth(reqOptions, credentials, bodyChunks, callback, isHttps, response, method);
-		}).end();
+			addNTLMAuthenticateReqInfo(credentials, reqOptions, res);
 	}
 };
 
+exports.getAuthInfo = function (res) {
+	var method = getAuthMethName(res);
+
+	return {
+		method:             method,
+		isChallengeMessage: method === 'NTLM' ? ntlm.isChallengeMessage(res) : false,
+		canAuthorize:       !!method
+	}
+};
