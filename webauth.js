@@ -62,6 +62,12 @@ exports.addCredentials = function (credentials, reqOptions, res, protocolInterfa
 	}
 };
 
+exports.requiresResBody = function (res) {
+    var authInfo = exports.getAuthInfo(res);
+
+    return !authInfo.isChallengeMessage && authInfo.method.toLowerCase() === 'ntlm';
+};
+
 exports.getAuthInfo = function (res) {
 	var method = getAuthMethName(res);
 
